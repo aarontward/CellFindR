@@ -627,5 +627,5 @@ getting the stats files, the matrice files as well as the data qualities violin 
 ```{r get_analysis}
 gen_matrix_plot(tenx,output_folder=output_loc,proj_name=proj_name)
 get_analysis(tenx,output_folder=output_loc)
-#get_plots(tenx,output_folder=output_loc)
+get_plots(tenx,output_folder=output_loc)
 ```
