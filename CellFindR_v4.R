@@ -1,4 +1,4 @@
-# cellFindR 3.1, version for Seurat 4.0.5
+# cellFindR 4.0, version for Seurat 4.0.5
 # 3.15.2022 Kevin Yu, Amar H Sheth
 
 # get_matrix make log scaled. 
