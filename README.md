@@ -59,6 +59,4 @@ If you find CellfindR useful, please reference:
 
 Development of the Mouse and Human Cochlea at Single Cell Resolution. Kevin Shengyang Yu, Stacey M. Frumm, Jason S. Park, Katharine Lee, Daniel M. Wong, Lauren Byrnes, Sarah M. Knox, Julie B. Sneddon, Aaron D. Tward. bioRxiv 739680; doi: https://doi.org/10.1101/739680
 
-Our single-cell data can be accessed via ____. 
-
 If you have any inquiries or debugging questions, please contact Amar Sheth (amar.sheth@yale.edu) or (aaron.tward@ucsf.edu)
