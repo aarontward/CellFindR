@@ -1,8 +1,6 @@
 # cellFindR 4.0, version for Seurat 4.0.5
-# 3.15.2022 Kevin Yu, Amar H Sheth
+#8.25.2022 Kevin Yu, Amar H Sheth
 
-# get_matrix make log scaled. 
-# iterative change to sub
 
 library(Seurat)
 library(dplyr)
@@ -12,20 +10,6 @@ library(RColorBrewer)
 library(pheatmap)
 library(limma)
 library(presto)
-dev.off()
-
-setwd("~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/E12.5")
-file_loc="~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/E12.5/"
-output_loc="~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/outdir_v2/"
-proj_name='m_12w_inner_ear'
-tenx <- load_tenx(file_loc=file_loc,output_loc=output_loc,proj_name=proj_name)
-res<-find_res(tenx)
-tenx <- out_tenx(tenx,output_loc=output_loc,proj_name=proj_name)
-tenx <- sub_clustering(tenx,output_folder=output_loc)
-gen_matrix_plot(tenx,output_folder=output_loc,proj_name=proj_name)
-get_analysis(tenx,output_folder=output_loc)
-get_plots(tenx,output_folder=output_loc)
-
 
 # loading tenx data
 # input: file_loc = location of file to load
@@ -67,13 +51,13 @@ out_tenx <- function(tenx, output_loc,proj_name = 'myproject',res = 0.1, cutoff=
   return(tenx)
 }
 
-
 # asking if the grouping is a cluster
 # input: tenx = tenx object
 # thresh_genes = threshold of genes at thresh_val
 # thresh_val = value of the threshold in log space
-# pval = cut off of pval for the signficance
-is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval_thresh = 1e-4){
+# pval = cut off of pval for the significance
+
+is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval = 1e-4){
   val = 0 # groups that does not satisfy threshold genes
   counter = 0 # groups that satisfy threshold genes 
   # loop through the identitiy
@@ -83,16 +67,17 @@ is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval_thresh
     if (sum(tenx@active.ident == j) < 5){
       return(FALSE)
     }
-    markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==j) %>% filter(pct_in>=25) %>% 
-      filter(padj<=pval_thresh)
-    
+    markers <- FindMarkers(tenx, ident.1 = j, min.pct = 0.25)
+    markers <- markers[markers$p_val_adj < pval,]
+    #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==j) %>% filter(pct_in>=25) %>%filter(padj<=pval_thresh)
     #find if the 10th biggest is less than log2, sum 
     #print(sort(markers$logFC, decreasing = TRUE)[thresh_genes])
+    #find if the 10th biggest is less than log2, sum 
+    print(sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes])
     # if less than 10 significant genes
-    
-    if (length((markers$logFC)) < 10){
+    if (length((markers$avg_log2FC)) < thresh_genes){
       val <- val + 1
-    } else if (sort(markers$logFC, decreasing = TRUE)[thresh_genes] < thresh_val){
+    } else if (sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes] < thresh_val){
       #print(val)
       val <- val + 1
     } else{
@@ -120,7 +105,6 @@ find_res <- function(tenx, initial_res = 0.1, jump = 0.1, thresh_genes = 10,
                      thresh_val = log(2)) {
   RES_POST <- initial_res #keeping
   RES_IT <- initial_res #iterative
-  
   while(TRUE){
     tenx <- FindNeighbors(tenx, dims = 1:20,verbose=FALSE)
     tenx <- FindClusters(tenx, resolution = RES_IT,verbose=FALSE)
@@ -160,7 +144,6 @@ find_res <- function(tenx, initial_res = 0.1, jump = 0.1, thresh_genes = 10,
 sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
                            thresh_genes = 10, thresh_val = log(2)){
   #print('Running subclustering')
-  
   #public variables:
   ##resolution keeper:
   res_keep <- data.frame('cluster'= NA,'res'= NA, 'num_clusters' =NA)
@@ -290,14 +273,13 @@ gen_matrix_plot <-function(tenx, output_folder = '.', proj_name = 'proj_name'){
   dir.create(file_create)
   dir.create(paste(file_create, 'Cluster', sep = '/'))
   dir.create(paste(file_create, 'Violin', sep = '/'))
-  
   ggsave(paste(file_create,'/',proj_name,'_umap.pdf', sep = ''), DimPlot(tenx, label = TRUE))
-  markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>%  filter(logFC>=0.25) %>% filter(pct_in>=25)
-  markers_filtered <- markers %>% group_by(group) %>% top_n(n = 50, wt = logFC)
-  genes <- unique(markers_filtered$feature)
-  #markers <-FindAllMarkers(tenx,only.pos = TRUE,min.pct = 0.25,thresh.use = 0.25)
-  #markers_filtered <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_log2FC) 
-  #genes <- unique(markers_filtered$gene)
+  #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>%  filter(logFC>=0.25) %>% filter(pct_in>=25)
+  #markers_filtered <- markers %>% group_by(group) %>% top_n(n = 50, wt = logFC)
+  #genes <- unique(markers_filtered$feature)
+  markers <-FindAllMarkers(tenx,only.pos = TRUE,min.pct = 0.25,thresh.use = 0.25)
+  markers_filtered <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_log2FC) 
+  genes <- unique(markers_filtered$gene)
   matrix_gen <- get_matrix(tenx)
   write.csv(matrix_gen,paste(file_create,'/',proj_name, '_matrix.csv', sep = ''), row.names = TRUE)
   saveRDS(tenx, file = paste(file_create,'/',proj_name, '.rds', sep = ''))
@@ -319,14 +301,14 @@ get_matrix <- function(tenx){
   matrix_all <- data.frame(row.names = rownames(avg_expression$RNA))
   for (i in levels(tenx@active.ident)){
     print(i)
-    markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==i) %>% filter(logFC>=0.1)
-    #markers <- FindMarkers(tenx, ident.1 = i, logfc.threshold = 0.1)
-    avg_val <- avg_expression$RNA[i]
-    avg_diff <- markers[rownames(avg_expression$RNA),]$logFC
+    #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==i) %>% filter(logFC>=0.1)
+    #rownames(markers) = markers$feature
+    markers <- FindMarkers(tenx, ident.1 = i, min.pct = 0.25)
+    avg_val <- avg_expression$RNA[, toString(i)]
+    avg_diff <- markers[rownames(avg_expression$RNA),]$avg_log2FC
     avg_diff[is.na(avg_diff)] <-0
-    p_val <- markers[rownames(avg_expression$RNA),]$padj
+    p_val <- markers[rownames(avg_expression$RNA),]$p_val_adj
     p_val[is.na(p_val)] <-1
-    
     matrix_all <- cbind(matrix_all, avg_val)
     matrix_all <- cbind(matrix_all, avg_diff)
     matrix_all <- cbind(matrix_all, p_val)
@@ -337,7 +319,6 @@ get_matrix <- function(tenx){
     name_col <- c(name_col,(c(paste(k,'Mean', sep = '_'),paste(k,'Avg_diff', sep = '_') , paste(k,'Pval', sep = '_'))))
   }
   colnames(matrix_all) <- name_col
-  matrix
   return(matrix_all)
 }
 
@@ -360,10 +341,8 @@ get_stats <- function(tenx, num_genes = 20){
     # avg_umi
     aod <- c(aod, mean(subgroup@meta.data$nFeature_RNA))
     # top 10 diff genes
-    top_markers <- wilcoxauc(tenx,"cellfindr","counts") %>% filter(group==groups) %>% filter(pct_in>=25) %>% 
-      arrange(desc(logFC)) %>% top_n(n = num_genes, wt = logFC)
-    #markers <- FindMarkers(tenx, groups)
-    #top_markers <- row.names(markers)[1:num_genes]
+    markers <- FindMarkers(tenx, groups)
+    top_markers <- row.names(markers)[1:num_genes]
     for (topm in top_markers$feature){
       aod <- c(aod, topm)
     }
@@ -377,8 +356,7 @@ get_plots<- function(tenx, output_folder = '.'){
   dir_creater <- paste(output_folder, '/plots', sep = '')
   dir.create(dir_creater)
   for (groups in levels(tenx@active.ident)){
-    markers <- wilcoxauc(tenx,"cellfindr","counts") %>% filter(group==groups) %>% arrange(desc(logFC))
-    #markers <-FindMarkers(tenx, groups)
+    markers <-FindMarkers(tenx, groups)
     maxer <- min(30, length(markers$feature))
     for (gene in markers$feature[1:maxer]){
       ggsave(paste(dir_creater,'/', gene, '_cluster.pdf', sep = ''),    
@@ -407,168 +385,3 @@ metrics_output <- function(tenx, output_folder = '.', species = 'mouse'){
          VlnPlot(tenx, features = 'nFeature_RNA'), width =length(levels(tenx@active.ident)), height = 5)
 }
 
-
-# get the top 100 genes from the values
-get_top100 <- function(a, s){
-  sorted <- a[order(a[s], decreasing = TRUE), ]
-  return(row.names(sorted)[1:100])
-}
-
-intersection_top100 <- function(new_expression_table, old_expression_table){
-  mat_cor <- 0
-  names <- (colnames(new_expression_table))
-  mat_cor <-data.frame(row.names = names)
-  
-  for (i in colnames(old_expression_table)){
-    print(paste('Subset', i))
-    #sort based on column one and extract list
-    tester <- get_top100(old_expression_table, i)
-    list_of_i <- c()
-    for (j in colnames(new_expression_table)){
-      # new tables for correlation
-      o <-get_top100(new_expression_table, j)
-      list_of_i <- c(list_of_i, length(intersect(tester,o)))
-      print(length(intersect(tester,o)))
-    }
-    df <- data.frame(j=list_of_i)
-    mat_cor <- cbind(mat_cor, df)
-  }
-  colnames(mat_cor) <- colnames(old_expression_table)
-  return(mat_cor)
-}
-
-##############################
-#mouse human comparison
-# get intersection of mouse to human 
-# gets the index of the reference in mouse or in human, 
-
-ortholog_index <- function(list_genes, id = "Mouse"){
-  table_ref <- read.csv('/Users/kyu/Desktop/Project_Cochlea/look_up_table/look_up_table.csv')
-  
-  index_list <- c()
-  if (id == "Mouse"){
-    for (gene in list_genes){
-      index_list <- c(index_list, which(table_ref$Mouse == gene)[1])
-    }
-  }
-  if (id =="Human"){
-    for (gene in list_genes){
-      index_list <- c(index_list, which(table_ref$Human == gene)[1])
-    }
-  }
-  return(index_list)
-}
-
-# creates intersection based on the 
-intersection_h_m <- function(human_matrix, mouse_matrix){
-  # set up ending coorelation matrix
-  mat_cor <- 0
-  names <- (colnames(mouse_matrix))
-  mat_cor <-data.frame(row.names = names)
-  
-  # iterate through each subgroup in the human matrix
-  for (i in colnames(human_matrix)){
-    print(paste('Subset', i))
-    
-    #set up all the human genes and gets the index with respect to the hash table
-    human_genes<- get_top100(human_matrix, i)
-    human_index <- ortholog_index(human_genes, id= 'Human')
-    list_of_i <- c()
-    
-    for (j in colnames(mouse_matrix)){
-      #convert to human
-      mouse_genes <- get_top100(mouse_matrix, j)
-      mouse_index <- ortholog_index(mouse_genes)
-      
-      # new tables for correlation
-      # could do it by homology index (returns might be easier)
-      
-      #get intersect of the values:
-      intersect_hm <- intersect(human_index, mouse_index)
-      val_hm <- length(intersect_hm)
-      # if has a NA remove 1
-      if (is.element(NA, intersect_hm)){
-        val_hm <- val_hm -1
-      }
-      list_of_i <- c(list_of_i, val_hm)
-      print(paste('Intersect', val_hm))
-    }
-    df <- data.frame(j=list_of_i)
-    mat_cor <- cbind(mat_cor, df)
-  }
-  colnames(mat_cor) <- colnames(human_matrix)
-  return(mat_cor)
-}
-
-
-# get deafness gene plots need to reupdate 
-get_deafness_plot <- function(tenx, id = 'Mouse', name = 'deafness'){
-  if (id == "Mouse"){
-    df_deafness <- read.csv("/Users/kyu/Desktop/Project_Cochlea/look_up_table/Deafness_gene_list.csv", header = FALSE)
-  }
-  else{
-    df_deafness <- read.csv("/Users/kyu/Desktop/Project_Cochlea/look_up_table/Deafness_gene_list_human.csv", header = FALSE)
-  }
-  
-  Genes <- 0
-  # loop through all the different subclusters
-  # initialize data.frame 
-  names <- rownames(tenx@scale.data)
-  Genes <-data.frame(row.names = names)
-  
-  for (j in levels(tenx@ident)){
-    # subset each one and then make each column that way. 
-    test <- SubsetData(tenx, ident.use = j)
-    mat_simp <- test@scale.data # scaled data from the values
-    mat_simp <-as.matrix(mat_simp)
-    row_means <- rowMeans(mat_simp, na.rm=TRUE)
-    df <- data.frame( j=row_means)
-    colnames(df) <-j
-    Genes <- cbind(Genes, df)
-    print(j)
-  }
-  
-  # remove genes column
-  # set upper limit as 1
-  Genes[Genes <0 ] <- 0
-  Genes[Genes >1] <- 1
-  # write to heatmap (find the file for the deafness genes)
-  list_deafness <- c()
-  #get only the unique ones
-  genenames <- row.names(tenx@scale.data)
-  for (gene in df_deafness[,1]){
-    if (any(genenames == gene)){
-      list_deafness <- c(list_deafness, gene)
-    }
-  }
-  list_deafness <- unique(list_deafness)
-  
-  ###
-  # get rid of it 
-  
-  heatmap_test <- Genes[list_deafness,]
-  heatmap_test <- heatmap_test[1:length(heatmap_test)]
-  pdf(paste('./', name,'.pdf', sep = ''), width = 12, height = 20)
-  pheatmap(heatmap_test, color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100))
-  dev.off()
-  return(heatmap_test)
-}
-
-# get timecourse
-get_timecourse <- function(tenx){
-  aoe <-c('Group', unique(tenx@meta.data$orig.ident))
-  df <- data.frame(aoe)
-  
-  for (groups in levels(tenx@active.ident)){
-    subgroup <-subset(tenx, idents = groups)
-    # group name
-    aod <- c(groups)
-    subgroup <-subset(tenx, idents = groups)
-    aod <- c(groups)
-    for (val in unique(tenx@meta.data$orig.ident)){
-      aod <- c(aod, sum(subgroup@meta.data == val))
-    }
-    df[groups] <-aod
-  }
-  return(df)
-}
