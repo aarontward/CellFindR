@@ -1,21 +1,20 @@
 ---
-title: "CellfindR_Vignette"
-author: "Kevin Yu, Amar Sheth"
-date: "3/15/2022"
+title: "CellFindR Vignette for Seurat 4.0"
+author: "Kevin Yu"
+date: "2022-08-24"
 output: html_document
 ---
 
-```{r setup, include=FALSE, echo = FALSE}
-knitr::opts_knit$set(root.dir = "~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/E12.5")
-```
-## CellFindR pipeline
-This tutorial helps you run cellfindR on your dataset. Please make sure you have Seurat Installed and that you run all the functions that are included in the CellFindR.R script file. 
-```{r include = FALSE}
-# CellFindR 3.1, version for Seurat 4.0.5
-# 3.15.2022 Kevin Yu, Amar H Sheth
+## Introduction
+CellFindR is a pipeline for Single Cell RNA sequencing that helps with unsupervised clustering of your groups. It uses a few scripts built in R and utilizes the Seurat environment package: <https://satijalab.org/seurat/>. 
 
-# get_matrix make log scaled. 
-# iterative change to sub
+This tutorial helps guide users to using the functions for CellFindR and walks through an analysis of one dataset.
+More information about the CellFindR algorithm can be found here in our preprint: <https://www.biorxiv.org/content/10.1101/739680v2>
+
+## Step 1: initializing environment 
+The first step is to make sure R has all the packages needed: please install: Seurat, dplyr, stringr, ggplot2, RColorBrewer, pheatmap, limma and presto. We recommend running functions in RStudio. We are runninng R 4.2.1 with Seurat 4.0
+
+```{r message=FALSE, warning=FALSE}
 library(Seurat)
 library(dplyr)
 library(stringr)
@@ -24,7 +23,25 @@ library(RColorBrewer)
 library(pheatmap)
 library(limma)
 library(presto)
-#dev.off()
+```
+
+We can actually easily load our cellfindR functions by just running all the code in the separate CellFindR.R script file. All the functions then should be accessible in our environment. That file should start with the load_tenx fuction, when this is run, it should populate your data environment with these functions. 
+
+```{r include=FALSE}
+# cellFindR 4.0, version for Seurat 4.0.5
+# 3.15.2022 Kevin Yu, Amar H Sheth
+
+# get_matrix make log scaled. 
+# iterative change to sub
+
+library(Seurat)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+library(RColorBrewer)
+library(pheatmap)
+library(limma)
+library(presto)
 
 # loading tenx data
 # input: file_loc = location of file to load
@@ -42,7 +59,7 @@ load_tenx <- function(file_loc, output_loc,proj_name = 'myproject',res = 0.1, cu
   VlnPlot(tenx, features = c("nFeature_RNA", "nCount_RNA", "percent.MT"), ncol = 3)
   
   ###############################
-  tenx <- NormalizeData(tenx, normalization.method = "LogNormalize", scale.factor = 10000,verbose=FALSE)
+  tenx <- NormalizeData(tenx, normalization.method = "LogNormalize", scale.factor = 10000)
   tenx <- FindVariableFeatures(tenx, selection.method = "vst", nfeatures = 2000,verbose=FALSE)
   top10 <- head(VariableFeatures(tenx), 10)
   plot1 <- VariableFeaturePlot(tenx)
@@ -58,21 +75,21 @@ load_tenx <- function(file_loc, output_loc,proj_name = 'myproject',res = 0.1, cu
 
 out_tenx <- function(tenx, output_loc,proj_name = 'myproject',res = 0.1, cutoff= 10000, mito = FALSE){
   tenx <- FindClusters(tenx, resolution = res,verbose=FALSE)
-  tenx<-RunUMAP(tenx, dims = 1:20,verbose=FALSE)
+  tenx<-RunUMAP(tenx, dims = 1:20)
   ggsave(paste(output_loc, '/', proj_name, '_UMAP.pdf',sep = ""), 
          DimPlot(tenx, reduction = "umap"), width = 8, height = 8)
   #print("finished DIMPLOT")
-  saveRDS(tenx, file = paste(output_loc,'/',proj_name, ".rds", sep = ''))
+  saveRDS(tenx, file = paste(output_loc,'/', proj_name, ".rds", sep = ''))
   return(tenx)
 }
-
 
 # asking if the grouping is a cluster
 # input: tenx = tenx object
 # thresh_genes = threshold of genes at thresh_val
 # thresh_val = value of the threshold in log space
-# pval = cut off of pval for the signficance
-is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval_thresh = 1e-4){
+# pval = cut off of pval for the significance
+
+is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval = 1e-4){
   val = 0 # groups that does not satisfy threshold genes
   counter = 0 # groups that satisfy threshold genes 
   # loop through the identitiy
@@ -82,16 +99,17 @@ is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval_thresh
     if (sum(tenx@active.ident == j) < 5){
       return(FALSE)
     }
-    markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==j) %>% filter(pct_in>=25) %>% 
-      filter(padj<=pval_thresh)
-    
+    markers <- FindMarkers(tenx, ident.1 = j, min.pct = 0.25)
+    markers <- markers[markers$p_val_adj < pval,]
+    #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==j) %>% filter(pct_in>=25) %>%filter(padj<=pval_thresh)
     #find if the 10th biggest is less than log2, sum 
     #print(sort(markers$logFC, decreasing = TRUE)[thresh_genes])
+    #find if the 10th biggest is less than log2, sum 
+    print(sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes])
     # if less than 10 significant genes
-    
-    if (length((markers$logFC)) < 10){
+    if (length((markers$avg_log2FC)) < thresh_genes){
       val <- val + 1
-    } else if (sort(markers$logFC, decreasing = TRUE)[thresh_genes] < thresh_val){
+    } else if (sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes] < thresh_val){
       #print(val)
       val <- val + 1
     } else{
@@ -119,7 +137,6 @@ find_res <- function(tenx, initial_res = 0.1, jump = 0.1, thresh_genes = 10,
                      thresh_val = log(2)) {
   RES_POST <- initial_res #keeping
   RES_IT <- initial_res #iterative
-  
   while(TRUE){
     tenx <- FindNeighbors(tenx, dims = 1:20,verbose=FALSE)
     tenx <- FindClusters(tenx, resolution = RES_IT,verbose=FALSE)
@@ -159,7 +176,6 @@ find_res <- function(tenx, initial_res = 0.1, jump = 0.1, thresh_genes = 10,
 sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
                            thresh_genes = 10, thresh_val = log(2)){
   #print('Running subclustering')
-  
   #public variables:
   ##resolution keeper:
   res_keep <- data.frame('cluster'= NA,'res'= NA, 'num_clusters' =NA)
@@ -184,7 +200,6 @@ sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
     # need to recenter
     sub_tenx <- FindVariableFeatures(sub_tenx, selection.method = "vst", nfeatures = 2000,verbose=FALSE)
     sub_tenx <- FindNeighbors(sub_tenx, dims = 1:20, verbose = FALSE)
-    
     if (dim(sub_tenx)[2] >49){
       sub_tenx <- RunUMAP(sub_tenx, dims = 1:20, n.neighbors = 10)
     }else{
@@ -199,7 +214,7 @@ sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
     if (set_res == 0 || length(levels(sub_tenx@active.ident)) == 1){
       lib_c <- lib_c[lib_c != j]   
       #print(paste("if_statement_completed",j))
-      file_create <-paste(output_folder,j,'/',sep = '')
+      file_create <-paste(output_folder,'/', j,'/',sep = '')
       dir.create(file_create)
       saveRDS(sub_tenx, file = paste(file_create,'/',j, '.rds', sep = ''))
     }
@@ -237,7 +252,7 @@ sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
   levels(tenx) <-str_sort(levels(tenx), numeric = TRUE)
   
   #graph umap
-  ggsave(paste(output_folder, proj_name, '_CellfindR_umap.pdf',sep = ""), 
+  ggsave(paste(output_folder, '/', proj_name, '_CellfindR_umap.pdf',sep = ""), 
          DimPlot(tenx, label = TRUE), width = 10, height = 8)
   return(tenx)
 }
@@ -246,19 +261,19 @@ get_analysis <- function(tenx, output_folder = '.', proj_name = 'proj_name'){
   # output DataQ files
   
   # percent.mt plot
-  ggsave(paste(output_folder, proj_name, '_percent_mito.pdf',sep = ""), 
+  ggsave(paste(output_folder, '/', proj_name, '_percent_mito.pdf',sep = ""), 
          FeaturePlot(tenx, "percent.MT"), width = 8, height = 8)
   
   # percent.mt violin plot
-  ggsave(paste(output_folder, proj_name, '_percent_mito_vln.pdf',sep = ""), 
+  ggsave(paste(output_folder, '/', proj_name, '_percent_mito_vln.pdf',sep = ""), 
          VlnPlot(tenx, "percent.MT"), width = length(levels(tenx@active.ident)), height = 5)
   
   # umi plot
-  ggsave(paste(output_folder, proj_name, '_nCount_RNA.pdf',sep = ""), 
+  ggsave(paste(output_folder, '/', proj_name, '_nCount_RNA.pdf',sep = ""), 
          FeaturePlot(tenx, 'nCount_RNA'), width = 8, height = 8)
   
   # umi violin plot
-  ggsave(paste(output_folder, proj_name, '_nCount_RNA_vln.pdf',sep = ""), 
+  ggsave(paste(output_folder, '/', proj_name, '_nCount_RNA_vln.pdf',sep = ""), 
          VlnPlot(tenx, 'nCount_RNA'), width = length(levels(tenx@active.ident)), height = 5)
   
   #############
@@ -268,17 +283,17 @@ get_analysis <- function(tenx, output_folder = '.', proj_name = 'proj_name'){
   levels(tenx) <-str_sort(levels(tenx), numeric = TRUE)
   
   z <- get_matrix(tenx)
-  write.csv(z, file = paste(output_folder, 'matrix_cellfindr.csv', sep = ''))
+  write.csv(z, file = paste(output_folder, '/', 'matrix_cellfindr.csv', sep = ''))
   
   a <- get_stats(tenx)
-  write.csv(a, file = paste(output_folder, 'all_stats_cellfindr.csv', sep = ''))
+  write.csv(a, file = paste(output_folder, '/', 'all_stats_cellfindr.csv', sep = ''))
   
   tenx <-SetIdent(tenx, value = 'seurat_clusters')
   y <- get_matrix(tenx)
-  write.csv(y, file = paste(output_folder, 'matrix_big_groups.csv', sep = ''))
+  write.csv(y, file = paste(output_folder, '/', 'matrix_big_groups.csv', sep = ''))
   
   a <- get_stats(tenx)
-  write.csv(a, file = paste(output_folder, 'all_stats_big_groups.csv', sep = ''))
+  write.csv(a, file = paste(output_folder, '/', 'all_stats_big_groups.csv', sep = ''))
   
 }
 
@@ -286,18 +301,17 @@ get_analysis <- function(tenx, output_folder = '.', proj_name = 'proj_name'){
 # generate matrix and plots
 gen_matrix_plot <-function(tenx, output_folder = '.', proj_name = 'proj_name'){
   #create subdirectories
-  file_create <- paste(output_folder,proj_name, sep ='')
+  file_create <- paste(output_folder, '/',proj_name, sep ='')
   dir.create(file_create)
   dir.create(paste(file_create, 'Cluster', sep = '/'))
   dir.create(paste(file_create, 'Violin', sep = '/'))
-  
   ggsave(paste(file_create,'/',proj_name,'_umap.pdf', sep = ''), DimPlot(tenx, label = TRUE))
-  markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>%  filter(logFC>=0.25) %>% filter(pct_in>=25)
-  markers_filtered <- markers %>% group_by(group) %>% top_n(n = 50, wt = logFC)
-  genes <- unique(markers_filtered$feature)
-  #markers <-FindAllMarkers(tenx,only.pos = TRUE,min.pct = 0.25,thresh.use = 0.25)
-  #markers_filtered <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_log2FC) 
-  #genes <- unique(markers_filtered$gene)
+  #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>%  filter(logFC>=0.25) %>% filter(pct_in>=25)
+  #markers_filtered <- markers %>% group_by(group) %>% top_n(n = 50, wt = logFC)
+  #genes <- unique(markers_filtered$feature)
+  markers <-FindAllMarkers(tenx,only.pos = TRUE,min.pct = 0.25,thresh.use = 0.25)
+  markers_filtered <- markers %>% group_by(cluster) %>% top_n(n = 20, wt = avg_log2FC) 
+  genes <- unique(markers_filtered$gene)
   matrix_gen <- get_matrix(tenx)
   write.csv(matrix_gen,paste(file_create,'/',proj_name, '_matrix.csv', sep = ''), row.names = TRUE)
   saveRDS(tenx, file = paste(file_create,'/',proj_name, '.rds', sep = ''))
@@ -319,14 +333,14 @@ get_matrix <- function(tenx){
   matrix_all <- data.frame(row.names = rownames(avg_expression$RNA))
   for (i in levels(tenx@active.ident)){
     print(i)
-    markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==i) %>% filter(logFC>=0.1)
-    #markers <- FindMarkers(tenx, ident.1 = i, logfc.threshold = 0.1)
-    avg_val <- avg_expression$RNA[i]
-    avg_diff <- markers[rownames(avg_expression$RNA),]$logFC
+    #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==i) %>% filter(logFC>=0.1)
+    #rownames(markers) = markers$feature
+    markers <- FindMarkers(tenx, ident.1 = i, min.pct = 0.25)
+    avg_val <- avg_expression$RNA[, toString(i)]
+    avg_diff <- markers[rownames(avg_expression$RNA),]$avg_log2FC
     avg_diff[is.na(avg_diff)] <-0
-    p_val <- markers[rownames(avg_expression$RNA),]$padj
+    p_val <- markers[rownames(avg_expression$RNA),]$p_val_adj
     p_val[is.na(p_val)] <-1
-    
     matrix_all <- cbind(matrix_all, avg_val)
     matrix_all <- cbind(matrix_all, avg_diff)
     matrix_all <- cbind(matrix_all, p_val)
@@ -337,7 +351,6 @@ get_matrix <- function(tenx){
     name_col <- c(name_col,(c(paste(k,'Mean', sep = '_'),paste(k,'Avg_diff', sep = '_') , paste(k,'Pval', sep = '_'))))
   }
   colnames(matrix_all) <- name_col
-  matrix
   return(matrix_all)
 }
 
@@ -360,10 +373,8 @@ get_stats <- function(tenx, num_genes = 20){
     # avg_umi
     aod <- c(aod, mean(subgroup@meta.data$nFeature_RNA))
     # top 10 diff genes
-    top_markers <- wilcoxauc(tenx,"cellfindr","counts") %>% filter(group==groups) %>% filter(pct_in>=25) %>% 
-      arrange(desc(logFC)) %>% top_n(n = num_genes, wt = logFC)
-    #markers <- FindMarkers(tenx, groups)
-    #top_markers <- row.names(markers)[1:num_genes]
+    markers <- FindMarkers(tenx, groups)
+    top_markers <- row.names(markers)[1:num_genes]
     for (topm in top_markers$feature){
       aod <- c(aod, topm)
     }
@@ -371,261 +382,81 @@ get_stats <- function(tenx, num_genes = 20){
   }
   return(df)
 }
-
-# getting plots
-get_plots<- function(tenx, output_folder = '.'){
-  dir_creater <- paste(output_folder, '/plots', sep = '')
-  dir.create(dir_creater)
-  for (groups in levels(tenx@active.ident)){
-    markers <- wilcoxauc(tenx,"cellfindr","counts") %>% filter(group==groups) %>% arrange(desc(logFC))
-    #markers <-FindMarkers(tenx, groups)
-    maxer <- min(30, length(markers$feature))
-    for (gene in markers$feature[1:maxer]){
-      ggsave(paste(dir_creater,'/', gene, '_cluster.pdf', sep = ''),    
-             FeaturePlot(tenx, features = gene), width = 6, height = 6)
-      ggsave(paste(dir_creater,'/', gene, '_violin.pdf', sep = ''),    
-             VlnPlot(tenx, features = gene, slot = "counts", log = TRUE), width = length(levels(tenx@active.ident)), height = 5)
-    }
-  }
-}
-
-# output metrics
-metrics_output <- function(tenx, output_folder = '.', species = 'mouse'){
-  tenx@active.assay
-  # mito percent
-  if (species == 'mouse'){
-    ggsave(paste(output_folder, '/', 'percent_mito.pdf', sep = ''),    
-           VlnPlot(tenx, features = 'percent.mt'), width =  length(levels(tenx@active.ident)), height = 5)
-  }
-  if (species == 'human'){
-    ggsave(paste(output_folder, '/', 'percent_mito.pdf', sep = ''),    
-           VlnPlot(tenx, features = 'percent.MT'), width =  length(levels(tenx@active.ident)), height = 5)
-  }
-  # umi
-  print('test')
-  ggsave(paste(output_folder, '/', 'UMI.pdf', sep = ''),    
-         VlnPlot(tenx, features = 'nFeature_RNA'), width =length(levels(tenx@active.ident)), height = 5)
-}
-
-
-# get the top 100 genes from the values
-get_top100 <- function(a, s){
-  sorted <- a[order(a[s], decreasing = TRUE), ]
-  return(row.names(sorted)[1:100])
-}
-
-intersection_top100 <- function(new_expression_table, old_expression_table){
-  mat_cor <- 0
-  names <- (colnames(new_expression_table))
-  mat_cor <-data.frame(row.names = names)
-  
-  for (i in colnames(old_expression_table)){
-    print(paste('Subset', i))
-    #sort based on column one and extract list
-    tester <- get_top100(old_expression_table, i)
-    list_of_i <- c()
-    for (j in colnames(new_expression_table)){
-      # new tables for correlation
-      o <-get_top100(new_expression_table, j)
-      list_of_i <- c(list_of_i, length(intersect(tester,o)))
-      print(length(intersect(tester,o)))
-    }
-    df <- data.frame(j=list_of_i)
-    mat_cor <- cbind(mat_cor, df)
-  }
-  colnames(mat_cor) <- colnames(old_expression_table)
-  return(mat_cor)
-}
-
-##############################
-#mouse human comparison
-# get intersection of mouse to human 
-# gets the index of the reference in mouse or in human, 
-
-ortholog_index <- function(list_genes, id = "Mouse"){
-  table_ref <- read.csv('/Users/kyu/Desktop/Project_Cochlea/look_up_table/look_up_table.csv')
-  
-  index_list <- c()
-  if (id == "Mouse"){
-    for (gene in list_genes){
-      index_list <- c(index_list, which(table_ref$Mouse == gene)[1])
-    }
-  }
-  if (id =="Human"){
-    for (gene in list_genes){
-      index_list <- c(index_list, which(table_ref$Human == gene)[1])
-    }
-  }
-  return(index_list)
-}
-
-# creates intersection based on the 
-intersection_h_m <- function(human_matrix, mouse_matrix){
-  # set up ending coorelation matrix
-  mat_cor <- 0
-  names <- (colnames(mouse_matrix))
-  mat_cor <-data.frame(row.names = names)
-  
-  # iterate through each subgroup in the human matrix
-  for (i in colnames(human_matrix)){
-    print(paste('Subset', i))
-    
-    #set up all the human genes and gets the index with respect to the hash table
-    human_genes<- get_top100(human_matrix, i)
-    human_index <- ortholog_index(human_genes, id= 'Human')
-    list_of_i <- c()
-    
-    for (j in colnames(mouse_matrix)){
-      #convert to human
-      mouse_genes <- get_top100(mouse_matrix, j)
-      mouse_index <- ortholog_index(mouse_genes)
-      
-      # new tables for correlation
-      # could do it by homology index (returns might be easier)
-      
-      #get intersect of the values:
-      intersect_hm <- intersect(human_index, mouse_index)
-      val_hm <- length(intersect_hm)
-      # if has a NA remove 1
-      if (is.element(NA, intersect_hm)){
-        val_hm <- val_hm -1
-      }
-      list_of_i <- c(list_of_i, val_hm)
-      print(paste('Intersect', val_hm))
-    }
-    df <- data.frame(j=list_of_i)
-    mat_cor <- cbind(mat_cor, df)
-  }
-  colnames(mat_cor) <- colnames(human_matrix)
-  return(mat_cor)
-}
-
-
-# get deafness gene plots need to reupdate 
-get_deafness_plot <- function(tenx, id = 'Mouse', name = 'deafness'){
-  if (id == "Mouse"){
-    df_deafness <- read.csv("/Users/kyu/Desktop/Project_Cochlea/look_up_table/Deafness_gene_list.csv", header = FALSE)
-  }
-  else{
-    df_deafness <- read.csv("/Users/kyu/Desktop/Project_Cochlea/look_up_table/Deafness_gene_list_human.csv", header = FALSE)
-  }
-  
-  Genes <- 0
-  # loop through all the different subclusters
-  # initialize data.frame 
-  names <- rownames(tenx@scale.data)
-  Genes <-data.frame(row.names = names)
-  
-  for (j in levels(tenx@ident)){
-    # subset each one and then make each column that way. 
-    test <- SubsetData(tenx, ident.use = j)
-    mat_simp <- test@scale.data # scaled data from the values
-    mat_simp <-as.matrix(mat_simp)
-    row_means <- rowMeans(mat_simp, na.rm=TRUE)
-    df <- data.frame( j=row_means)
-    colnames(df) <-j
-    Genes <- cbind(Genes, df)
-    print(j)
-  }
-  
-  # remove genes column
-  # set upper limit as 1
-  Genes[Genes <0 ] <- 0
-  Genes[Genes >1] <- 1
-  # write to heatmap (find the file for the deafness genes)
-  list_deafness <- c()
-  #get only the unique ones
-  genenames <- row.names(tenx@scale.data)
-  for (gene in df_deafness[,1]){
-    if (any(genenames == gene)){
-      list_deafness <- c(list_deafness, gene)
-    }
-  }
-  list_deafness <- unique(list_deafness)
-  
-  ###
-  # get rid of it 
-  
-  heatmap_test <- Genes[list_deafness,]
-  heatmap_test <- heatmap_test[1:length(heatmap_test)]
-  pdf(paste('./', name,'.pdf', sep = ''), width = 12, height = 20)
-  pheatmap(heatmap_test, color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100))
-  dev.off()
-  return(heatmap_test)
-}
-
-# get timecourse
-get_timecourse <- function(tenx){
-  aoe <-c('Group', unique(tenx@meta.data$orig.ident))
-  df <- data.frame(aoe)
-  
-  for (groups in levels(tenx@active.ident)){
-    subgroup <-subset(tenx, idents = groups)
-    # group name
-    aod <- c(groups)
-    subgroup <-subset(tenx, idents = groups)
-    aod <- c(groups)
-    for (val in unique(tenx@meta.data$orig.ident)){
-      aod <- c(aod, sum(subgroup@meta.data == val))
-    }
-    df[groups] <-aod
-  }
-  return(df)
-}
 ```
 
-Now, please try and load the data, if you have a Seurat object already processed, or if you need a fresh 10x install use the load_data function. For this case, I will be demoing a mouse E12.5 cochlea dataset
+##
+Step 2: Initializing dataset
+Please set your working environment appropriately: mine is set into the folder where the 10x files are located for easiest processing. We are calling these variable: 
+
+```{r eval=FALSE}
+file_loc = 'location of 10x files'
+output_loc = 'location of where output files want to go'
+```
+
+```{r warning=FALSE, include=FALSE}
+file_loc="/Users/kevinyu/Desktop/CellFindR_Vignette/E14.5/"
+output_loc="/Users/kevinyu/Desktop/CellFindR_Vignette/E14.5/"
+```
+
 ```{r}
-library(Seurat)
-library(dplyr)
-library(stringr)
-library(ggplot2)
-library(RColorBrewer)
-library(pheatmap)
-library(limma)
-library(presto)
+proj_name='m_145w_inner_ear'
 ```
 
-```{r load data}
-## load data from processed RDS
-file_loc="~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/E12.5/"
-output_loc="~/Dropbox/Research/Tward-Krishnaswamy/CellFindR_v3/outdir_v2/"
-proj_name='m_12w_inner_ear'
+In this exercise, we have placed in github (as well in GEO) our E14.5 dataset and we are running this exercise on that dataset for simplicity.
 
-#load in the data
+### loading the data
+We will use our load_tenx function that will process the general initialization of seurat object
+You can also do this yourself as along as your have an Seurat object in your environment that you would like to run through CellFindR. Of note, we do not apply the 5% mitochondrial filter here. 
+
+```{r load data, message=FALSE, warning=FALSE}
 tenx <- load_tenx(file_loc=file_loc,output_loc=output_loc,proj_name=proj_name)
-#manual set res for first layer
+```
+
+we can manually set a resolution for the first layer if the groups are clear, this step saves a bit of computational power since finding the resolution for the first layer is a bit computationally intensive. 
+lets see what this first layer looks like!
+```{r message=FALSE, warning=FALSE, echo=FALSE}
 res <- 0.6
-#or find a resolution
-res<-find_res(tenx)
-#output the umap and output .rds file of the data clustered at the highest level
-tenx <- out_tenx(tenx,output_loc=output_loc,res=res,proj_name=proj_name)
-```
-## set working directory of output data and view data
-```{r}
-setwd(file_loc)
-DimPlot(tenx, reduction = "umap", label = TRUE)
-```
-## set initial groups
-we need to first set the initial groups to do the first layer of analysis, we can use find_res function for cellfindR or you can set a manual seurat resolution depending on what your data looks like. 
-```{r initial layer}
-#test out different resolutions
-res <- 0.7
 tenx <- FindClusters(tenx, resolution = res)
+tenx<-RunUMAP(tenx, dims = 1:20,verbose=FALSE)
 DimPlot(tenx, reduction = "umap",  label = TRUE)
 ```
-## run subclustering
-we create an output folder for the cellfindr outputs, creating a new directory. 
-Then we can run the file to create a new seurat object with the cellfindr labels. 
-```{r}
-tenx <- readRDS(paste(output_loc,"m_12w_inner_ear.rds",sep=""))
-tenx <- sub_clustering(tenx,output_folder=output_loc)
+
+### how to use the find_res function 
+to use the find_res function, you just need to place the seurat object into the function
+
+```{r eval=FALSE, include=FALSE}
+res_cellfindr<-find_res(tenx)
+print(res_cellfindr)
 ```
-## get the output matrices
-now that cellfindr has finished running you can get the special matrix data by running the get_analysis tool
-getting the stats files, the matrice files as well as the data qualities violin plots. 
-```{r get_analysis}
+
+### you can then output these files with the out_tenx function 
+it runs the clustering and UMAP at the set resolution and then output the UMAP and RDS file for the Seurat object
+
+```{r message=FALSE, warning=FALSE}
+tenx <- out_tenx(tenx,output_loc=output_loc,res=res,proj_name=proj_name)
+```
+
+## Step 3: Running CellFindR
+Once you have the seurat object with the initial clustering group set, the subclustering can be done via the subclustering function. This may take a few minutes to run! But files should start populating in the set directory
+In the directory, it should
++ 1: create a folder for each cluster/subcluster
++ 2: inside each subcluster it should create a .csv file with the differential gene expression of the subgroups
++ 3: a UMAP showing the distribution of cells
++ 4: a seurat rds file of this subgroup
++ 5: A UMAP of the expression of the top differential genes
++ 6: A violin plot of the gene expression based on the subclusters
+
+```{r running, message=FALSE, warning=FALSE}
+tenx <- sub_clustering(tenx,output_folder=output_loc)
+DimPlot(tenx, reduction = "umap",  label = TRUE)
+```
+
+## Step 4: Output data
+Once CellFindR has finished running, we can obtain the final UMAP and and overall matrix by running the analysis tool: get_analysis as well as the stats file which shows the top genes for each subcluster as well as statistics regarding number of cells. The violin plots and cluster maps of the top genes can be outputted by the get_plots function
+```{r eval=FALSE}
 gen_matrix_plot(tenx,output_folder=output_loc,proj_name=proj_name)
 get_analysis(tenx,output_folder=output_loc)
 get_plots(tenx,output_folder=output_loc)
 ```
+
+This concludes the tutorial for running CellFindR, you should have a manipulable R object with the CellFindR groupings as well as the output folder with the above analyses. 
