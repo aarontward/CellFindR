@@ -54,15 +54,14 @@ This function takes in a Seurat object with initialized first layer clustering i
 For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. 
 
 ### gen_matrix_plot
-
+For given Seurat object, returns violin/cluster plots of top differential genes for the active ident. Will also return RDS Seurat file, generate a get_matrix
 
 ### get_matrix
+For Seurat object with clusters in active ident, will generate a matrix that shows average expression, differential gene expression and P-value associated with of the cluster for every gene. 
 
 ### get_stats
+For Seurat object with clusters in the active ident, will generate matrix that shows the cell count, nUMI and gene count for every cluster as well as the top expressed genes. 
 
-### get_plots
-
-### metrics_output
 
 #### Reference, Data Availability, and Contact:
 If you find CellfindR useful, please reference:
