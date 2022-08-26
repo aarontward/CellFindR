@@ -2,7 +2,9 @@
 title: "CellFindR Vignette for Seurat 4.0"
 author: "Kevin Yu"
 date: "2022-08-24"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ## Introduction
@@ -203,7 +205,7 @@ sub_clustering <- function(tenx, output_folder = '.', proj_name = 'proj_name',
     if (dim(sub_tenx)[2] >49){
       sub_tenx <- RunUMAP(sub_tenx, dims = 1:20, n.neighbors = 10)
     }else{
-      print(paste("too small",j))
+      #print(paste("too small",j))
     }
     
     # get subgroups if there is a cluster, if not remove and label cells. 
@@ -332,7 +334,7 @@ get_matrix <- function(tenx){
   avg_expression <- AverageExpression(tenx, use.scale = TRUE,verbose=FALSE) # 
   matrix_all <- data.frame(row.names = rownames(avg_expression$RNA))
   for (i in levels(tenx@active.ident)){
-    print(i)
+    #print(i)
     #markers <- wilcoxauc(tenx,"seurat_clusters","counts") %>% filter(group==i) %>% filter(logFC>=0.1)
     #rownames(markers) = markers$feature
     markers <- FindMarkers(tenx, ident.1 = i, min.pct = 0.25)
@@ -347,7 +349,7 @@ get_matrix <- function(tenx){
   }
   name_col <- c()
   for (k in levels(tenx@active.ident)){
-    print(k)
+    #print(k)
     name_col <- c(name_col,(c(paste(k,'Mean', sep = '_'),paste(k,'Avg_diff', sep = '_') , paste(k,'Pval', sep = '_'))))
   }
   colnames(matrix_all) <- name_col
