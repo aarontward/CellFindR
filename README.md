@@ -32,19 +32,29 @@ Clone the repository from this github: https://docs.github.com/en/repositories/c
 ## Step 3: How to use
 Using CellFindR involves first loading in the functions provided in the CellFindR.R script. The best way do this is to open the file from the repository folder, highlight all (Ctrl/Cmd + A), and Run (Shift + Enter). Once loaded, we suggest creating a new R script (File > New > R Script) and running commands listed and demonstrated in the CellFindR_vignette.html file. The vignette can be opened using any web browser. **We detail each of the functions below and suggestions for ways in which our code can be modified for your use.** Please note that you will have to rerun the modified function to update it before calling it. 
 
+Here are the list of functions that pertains to CellFindR and the functions that helped generate figures from our paper. 
+
 ### load_tenx
+This function loads 10x matrix files and goes through the general processing steps of Seurat and creates a usable Seurat object. Outputs a Seurat object
 
 ### out_tenx
+This function is a quick function that selects a resolution, which then runs the UMAP and saves this as a pdf and as a Rdata Seurat object
 
 ### is_cluster
+This function takes in a Seurat object and initialized cluster groupings and asks if the current clustering configuration satisfy's CellFindR's metrics. 
+Output a boolean. 
 
 ### find_res
+This function finds the highest resolution that satifies CellFindR metrics. Using an iterativ approach to the is_cluster function. This outputs a numeric value. 
 
 ### sub_clustering
+This function takes in a Seurat object with initialized first layer clustering in the active ident and will output a Seurat object with CellFindR clustering groups. This function will take the most time to run. 
 
 ### get_analysis
+For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. 
 
 ### gen_matrix_plot
+
 
 ### get_matrix
 
