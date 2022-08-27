@@ -31,10 +31,7 @@ We can actually easily load our cellfindR functions by just running all the code
 
 ```{r include=FALSE}
 # cellFindR 4.0, version for Seurat 4.0.5
-# 3.15.2022 Kevin Yu, Amar H Sheth
-
-# get_matrix make log scaled. 
-# iterative change to sub
+#8.25.2022 Kevin Yu, Amar H Sheth
 
 library(Seurat)
 library(dplyr)
@@ -54,12 +51,9 @@ library(presto)
 load_tenx <- function(file_loc, output_loc,proj_name = 'myproject',res = 0.1, cutoff= 10000, mito = FALSE){
   tenx.data <- Read10X(data.dir = file_loc)
   tenx <- CreateSeuratObject(counts = tenx.data, project = proj_name, min.cells = 3, min.features = 200)
-  
   #processing
   tenx[["percent.MT"]] <- PercentageFeatureSet(tenx, pattern = "^MT-")
-  
   VlnPlot(tenx, features = c("nFeature_RNA", "nCount_RNA", "percent.MT"), ncol = 3)
-  
   ###############################
   tenx <- NormalizeData(tenx, normalization.method = "LogNormalize", scale.factor = 10000)
   tenx <- FindVariableFeatures(tenx, selection.method = "vst", nfeatures = 2000,verbose=FALSE)
@@ -107,7 +101,7 @@ is_cluster <- function(tenx, thresh_genes = 10, thresh_val = log(2), pval = 1e-4
     #find if the 10th biggest is less than log2, sum 
     #print(sort(markers$logFC, decreasing = TRUE)[thresh_genes])
     #find if the 10th biggest is less than log2, sum 
-    print(sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes])
+    #print(sort(markers$avg_log2FC, decreasing = TRUE)[thresh_genes])
     # if less than 10 significant genes
     if (length((markers$avg_log2FC)) < thresh_genes){
       val <- val + 1
@@ -158,7 +152,7 @@ find_res <- function(tenx, initial_res = 0.1, jump = 0.1, thresh_genes = 10,
         #print(paste('go back', RES_IT, sep = ' '))
         RES_IT <- RES_IT - jump
         RES_POST <- RES_IT
-        print(RES_POST)
+        #print(RES_POST)
         break
       } else{ # valid groups
         RES_POST <- RES_IT
@@ -331,7 +325,7 @@ gen_matrix_plot <-function(tenx, output_folder = '.', proj_name = 'proj_name'){
 # generate matrix
 get_matrix <- function(tenx){
   #print("getting matrix")
-  avg_expression <- AverageExpression(tenx, use.scale = TRUE,verbose=FALSE) # 
+  avg_expression <- AverageExpression(tenx, slot = 'scale.data', verbose=FALSE) # log normalized, scale data
   matrix_all <- data.frame(row.names = rownames(avg_expression$RNA))
   for (i in levels(tenx@active.ident)){
     #print(i)
@@ -355,7 +349,6 @@ get_matrix <- function(tenx){
   colnames(matrix_all) <- name_col
   return(matrix_all)
 }
-
 # get stats
 get_stats <- function(tenx, num_genes = 20){
   aoe <- c("Group", "cell_number", "avg_read", "avg_umi")
@@ -384,6 +377,42 @@ get_stats <- function(tenx, num_genes = 20){
   }
   return(df)
 }
+
+# getting plots
+get_plots<- function(tenx, output_folder = '.'){
+  dir_creater <- paste(output_folder, '/plots', sep = '')
+  dir.create(dir_creater)
+  for (groups in levels(tenx@active.ident)){
+    markers <-FindMarkers(tenx, groups)
+    maxer <- min(30, length(markers$feature))
+    for (gene in markers$feature[1:maxer]){
+      ggsave(paste(dir_creater,'/', gene, '_cluster.pdf', sep = ''),    
+             FeaturePlot(tenx, features = gene), width = 6, height = 6)
+      ggsave(paste(dir_creater,'/', gene, '_violin.pdf', sep = ''),    
+             VlnPlot(tenx, features = gene, slot = "counts", log = TRUE), width = length(levels(tenx@active.ident)), height = 5)
+    }
+  }
+}
+
+# output metrics
+metrics_output <- function(tenx, output_folder = '.', species = 'mouse'){
+  tenx@active.assay
+  # mito percent
+  if (species == 'mouse'){
+    ggsave(paste(output_folder, '/', 'percent_mito.pdf', sep = ''),    
+           VlnPlot(tenx, features = 'percent.mt'), width =  length(levels(tenx@active.ident)), height = 5)
+  }
+  if (species == 'human'){
+    ggsave(paste(output_folder, '/', 'percent_mito.pdf', sep = ''),    
+           VlnPlot(tenx, features = 'percent.MT'), width =  length(levels(tenx@active.ident)), height = 5)
+  }
+  # umi
+  #print('test')
+  ggsave(paste(output_folder, '/', 'UMI.pdf', sep = ''),    
+         VlnPlot(tenx, features = 'nFeature_RNA'), width =length(levels(tenx@active.ident)), height = 5)
+}
+
+
 ```
 
 ##
@@ -440,7 +469,7 @@ tenx <- out_tenx(tenx,output_loc=output_loc,res=res,proj_name=proj_name)
 
 ## Step 3: Running CellFindR
 Once you have the seurat object with the initial clustering group set, the subclustering can be done via the subclustering function. This may take a few minutes to run! But files should start populating in the set directory
-In the directory, it should
+In the directory, it should contain:
 + 1: create a folder for each cluster/subcluster
 + 2: inside each subcluster it should create a .csv file with the differential gene expression of the subgroups
 + 3: a UMAP showing the distribution of cells
@@ -455,10 +484,11 @@ DimPlot(tenx, reduction = "umap",  label = TRUE)
 
 ## Step 4: Output data
 Once CellFindR has finished running, we can obtain the final UMAP and and overall matrix by running the analysis tool: get_analysis as well as the stats file which shows the top genes for each subcluster as well as statistics regarding number of cells. The violin plots and cluster maps of the top genes can be outputted by the get_plots function
-```{r eval=FALSE}
+```{r eval=TRUE}
+write.csv(get_matrix(tenx),  file = paste(output_loc, '/', 'matrix_cellfindR.csv', sep = ''))
 gen_matrix_plot(tenx,output_folder=output_loc,proj_name=proj_name)
-get_analysis(tenx,output_folder=output_loc)
 get_plots(tenx,output_folder=output_loc)
+#get_analysis(tenx,output_folder=output_loc)
 ```
 
 This concludes the tutorial for running CellFindR, you should have a manipulable R object with the CellFindR groupings as well as the output folder with the above analyses. 
