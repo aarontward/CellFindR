@@ -32,6 +32,8 @@ Clone the repository from this github: https://docs.github.com/en/repositories/c
 ## Step 3: How to use
 Using CellFindR involves first loading in the functions provided in the CellFindR.R script. The best way do this is to open the file from the repository folder, highlight all (Ctrl/Cmd + A), and Run (Shift + Enter). Once loaded, we suggest creating a new R script (File > New > R Script) and running commands listed and demonstrated in the CellFindR_vignette.html file. The vignette can be opened using any web browser. **We detail each of the functions below and suggestions for ways in which our code can be modified for your use.** Please note that you will have to rerun the modified function to update it before calling it. 
 
+You should have your own datasets to run CellFindR but if you want to test it with our E14.5 Mouse Cochlea data it is accessible via geo: https://0-www-ncbi-nlm-nih-gov.brum.beds.ac.uk/geo/query/acc.cgi?acc=GSM4037811
+
 Here are the list of functions that pertains to CellFindR and the functions that helped generate figures from our paper. 
 
 ### load_tenx
@@ -49,9 +51,10 @@ This function finds the highest resolution that satifies CellFindR metrics. Usin
 
 ### sub_clustering
 This function takes in a Seurat object with initialized first layer clustering in the active ident and will output a Seurat object with CellFindR clustering groups. This function will take the most time to run. 
+Once this is run, inside your directly should have a folder for each subcluster, such as 0, 1 and as well as folders for subclusters such as 1.0, 1.0.0 and etc. A RDS file with the cluster of interest. If there are subgroups within this group,  within each of these folders, it should include a matrix in the format of the get_matrix function as described below between the clusters, folders cluster and violin for the top differential expressed genes and a UMAP representation of this cluster. 
 
 ### get_analysis
-For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. Then also runs the get_matrix and get_stats function s below
+For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. Then also runs the get_matrix and get_stats functions below
 
 ### gen_matrix_plot
 For given Seurat object, creates new directory inside the file and returns violin/cluster plots of the top 20 differential genes for the active ident. Will also return RDS Seurat file, generate a get_matrix matrix as below. 
@@ -66,6 +69,8 @@ Each column will be for one of the active identity in the object. The rows will 
 
 ## Running CellFindR vignette
 Please see attached CellFindR_vignette.html or the RMarkdown file. This should walk you through the steps needed to generate CellFindR files. We will list out a list of files that are generated here at the end of the tutorial with the correct outputs.
+
+At the end of the vignette, you should have an RDS file of the cellfindR run Seurat object. A folder that includes the files as run by get_analysis plot. The subclustering output of the folders. A cellfindR matrix (run through get_matrix). A folder with cluster and violin plots of top genes. 
 
 
 #### Reference, Data Availability, and Contact:
