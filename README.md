@@ -51,16 +51,21 @@ This function finds the highest resolution that satifies CellFindR metrics. Usin
 This function takes in a Seurat object with initialized first layer clustering in the active ident and will output a Seurat object with CellFindR clustering groups. This function will take the most time to run. 
 
 ### get_analysis
-For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. 
+For given Seurat object, returns mitochondria gene $ and UMI plots and the matrix, and statistics matrices in .csv form. Then also runs the get_matrix and get_stats function s below
 
 ### gen_matrix_plot
-For given Seurat object, returns violin/cluster plots of top differential genes for the active ident. Will also return RDS Seurat file, generate a get_matrix
+For given Seurat object, creates new directory inside the file and returns violin/cluster plots of the top 20 differential genes for the active ident. Will also return RDS Seurat file, generate a get_matrix matrix as below. 
 
 ### get_matrix
 For Seurat object with clusters in active ident, will generate a matrix that shows average expression, differential gene expression and P-value associated with of the cluster for every gene. 
+Across the rows, will be every gene name. Across the columns, the rows will be separated by the inputted identity cluster. If using the standard Seurat louvain clustering, it should start 0_Mean, 0_Avg_Diff, 0_Pval and so on for the other clusters. The mean reflects the log average that is centered by ScaleData output from the raw matrix file after Seurat standardization and calculated via the Seurat AverageExpression function. The Avg_diff computed via Wilcoxon rank sum test between the cluster of interest vs all the other cells not in this cluster. The Pval is the adjusted p-value, based on bonferroni correction using all genes in the dataset. These last two values are calculated from the FindMarker function in Seurat. 
 
 ### get_stats
 For Seurat object with clusters in the active ident, will generate matrix that shows the cell count, nUMI and gene count for every cluster as well as the top expressed genes. 
+Each column will be for one of the active identity in the object. The rows will show the metadata as the cell number, average number of reads, average number of numi in the cluster. THen it will show the top 10 differential genes as calculated via FindMarkers for this cluster compared to all the other cells not in this cluster in the object. 
+
+## Running CellFindR vignette
+Please see attached CellFindR_vignette.html or the RMarkdown file. This should walk you through the steps needed to generate CellFindR files. We will list out a list of files that are generated here at the end of the tutorial with the correct outputs.
 
 
 #### Reference, Data Availability, and Contact:
